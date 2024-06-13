@@ -2,7 +2,7 @@ library(magrittr)
 library(tidyverse)
 library(patchwork)
 
-force.redo = TRUE
+force.redo = FALSE
 
 if(!file.exists(file.path("data-derived", "fsa-counties.parquet")) | force.redo){
   unlink(file.path("data-derived", "fsa-counties.parquet"))
@@ -127,5 +127,3 @@ if(!file.exists(file.path("data-derived", "fsa-lfp-eligibility.parquet")) | forc
 
 fsa_lfp_eligibility <-
   arrow::read_parquet(file.path("data-derived", "fsa-lfp-eligibility.parquet"))
-
-
