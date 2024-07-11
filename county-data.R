@@ -38,6 +38,40 @@ if(!file.exists(file.path("data-derived", "fsa-counties.parquet")) | force.redo)
                  driver = "Parquet")
 }
 
+if(!file.exists(file.path("data-derived", "fsa-counties.fgb")) | force.redo){
+  unlink(file.path("data-derived", "fsa-counties.fgb"))
+  
+  download.file("https://raw.githubusercontent.com/mt-climate-office/fsa-lfp-eligibility/main/fsa-counties/FSA_Counties_dd17.gdb.zip",
+                destfile = file.path("data-raw", "FSA_Counties_dd17.gdb.zip"))
+  
+  gdalUtilities::ogr2ogr(
+    src_datasource_name = "/vsizip/data-raw/FSA_Counties_dd17.gdb.zip",
+    dst_datasource_name = "data-derived/fsa-counties.fgb",
+    t_srs = "EPSG:4326",
+    config_options = c(
+      COMPRESSION = "BROTLI",
+      # GEOMETRY_ENCODING = "GEOARROW",
+      WRITE_COVERING_BBOX = "NO"
+    ),
+    f = "FlatGeobuf",
+    nlt = "MULTIPOLYGON",
+    overwrite = TRUE
+  )
+  
+  dat <- sf::read_sf(file.path("data-derived", "fsa-counties.fgb")) %>%
+    dplyr::group_by(FSA_CODE = FSA_STCOU) %>%
+    dplyr::summarise(.groups = "drop") %>%
+    sf::st_make_valid() %>%
+    sf::st_intersection(
+      tigris::counties() %>%
+        dplyr::summarise() %>%
+        sf::st_transform(4326) %>%
+        sf::st_make_valid()
+    )
+  
+    sf::write_sf(dat, file.path("data-derived", "fsa-counties.fgb"), delete_dsn = TRUE)
+}
+
 fsa_counties <-
   sf::read_sf(file.path("data-derived", "fsa-counties.parquet"))
 
