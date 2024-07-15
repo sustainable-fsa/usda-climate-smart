@@ -49,7 +49,8 @@ plot_normal_grazing_w_drought <- function(county) {
       end = `Grazing Period End Date`
     ) %>% 
     dplyr::summarise(
-      plot_name = paste(plot_name, collapse = "\n")
+      plot_name = paste(plot_name, collapse = "\n"),
+      .groups = "drop"
     ) %>% 
     dplyr::arrange(plot_name) %>% 
     dplyr::mutate(plot_name = factor(plot_name)) 
@@ -60,7 +61,7 @@ plot_normal_grazing_w_drought <- function(county) {
     #   date = seq(min(date), max(date), by = "1 day")
     # )
   
-  fuzzyjoin::fuzzy_left_join(
+  dat <- fuzzyjoin::fuzzy_left_join(
     drought, grazing,
     by = c(
       "date" = "start",
@@ -73,13 +74,26 @@ plot_normal_grazing_w_drought <- function(county) {
     dplyr::group_by(group, class, plot_name) %>%
     dplyr::summarize(start = min(date), end = max(date), .groups = "drop") %>%
     dplyr::select(class, start, end, plot_name) %>%
-      dplyr::mutate(class = factor(
-      class, 
-      levels = c(0, 1, 2, 3, 4)
-    )) %>%
+      dplyr::mutate(
+        class = factor(
+          class, 
+          levels = c(0, 1, 2, 3, 4)
+        ),
+        end = end + 1
+    ) %>%
+    dplyr::filter(!is.na(class))
+  
+  if (nrow(dat) == 0) {
+    return("No drought during this period!")
+  }
+  
+  dat %>% 
     ggplot(aes(y = plot_name, color = class)) +
     geom_segment(aes(x = start, xend = end, 
-                     y = plot_name, yend = plot_name), linewidth = 2) +
+                     y = plot_name, yend = plot_name), 
+                 linewidth = 2,
+                 lineend = "butt",
+                 linejoin = "mitre") +
     scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +
     theme_minimal() +
     theme(
@@ -100,7 +114,7 @@ plot_normal_grazing_w_drought <- function(county) {
       y = "Forage Type", 
       x = "", 
       title = glue::glue(
-        "Max Drought Class During Normal Grazing Period"
+        "Drought During Normal Grazing Period"
       )
     ) 
 }
