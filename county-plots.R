@@ -1,8 +1,8 @@
 library(magrittr)
 library(ggplot2)
 
-fsa_counties <-
-  sf::read_sf(file.path("data-derived", "fsa-counties.fgb"))
+# fsa_counties <-
+#   sf::read_sf(file.path("data-derived", "fsa-counties.fgb"))
 
 usdm_counties <-
   arrow::read_parquet(file.path("data-derived", "usdm-counties.parquet"))
@@ -13,8 +13,20 @@ fsa_normal_grazing_periods <-
 fsa_lfp_eligibility <-
   arrow::read_parquet(file.path("data-derived", "fsa-lfp-eligibility.parquet"))
 
+county_names <- 
+  readr::read_csv(file.path("data-derived", "fsa-county-names.csv"),
+                  show_col_types=FALSE)
+
 county = "30063"
 plot_normal_grazing_w_drought <- function(county) {
+  
+  title_name <- county_names %>% 
+    dplyr::filter(FSA_CODE == county) %$%
+    name
+  
+  if (length(title_name) == 0) {
+    return(glue::glue("No Data for Specified County ({county})!"))
+  }
   
   drought <- usdm_counties %>% 
     dplyr::filter(FSA_CODE == county) %>%
@@ -69,23 +81,46 @@ plot_normal_grazing_w_drought <- function(county) {
     ),
     match_fun = list(`>=`, `<=`)
   ) %>% 
-    dplyr::filter(!is.na(plot_name)) %>% 
+    dplyr::filter(
+      !is.na(plot_name),
+      class >= 2
+    ) 
+  
+  if (nrow(dat) == 0) {
+    return(glue::glue("No D2 or Greater Drought in {county}"))
+  }
+  
+  dat <- dat %>% 
     dplyr::mutate(group = with(rle(class), rep(seq_along(values), lengths))) %>%
     dplyr::group_by(group, class, plot_name) %>%
-    dplyr::summarize(start = min(date), end = max(date), .groups = "drop") %>%
+    dplyr::summarize(
+      start = min(date), 
+      end = max(date),
+      .groups = "drop"
+    ) %>%
     dplyr::select(class, start, end, plot_name) %>%
       dplyr::mutate(
-        class = factor(
-          class, 
-          levels = c(0, 1, 2, 3, 4)
-        ),
-        end = end + 1
+        class = paste0("D", class),
+        midpoint = start + (end - start) / 2,
+        end = end + 1,
+        total_days = as.numeric(difftime(end, start, units = "days")),
+        weeks = total_days %/% 7,
+        days = total_days %% 7,
+        n_weeks = ifelse(weeks > 0 & days > 0, paste(weeks, ifelse(weeks == 1, "Week", "Weeks"), "and", days, ifelse(days == 1, "Day", "Days")),
+                         ifelse(weeks > 0, paste(weeks, ifelse(weeks == 1, "Week", "Weeks")),
+                                paste(days, ifelse(days == 1, "Day", "Days"))))
     ) %>%
     dplyr::filter(!is.na(class))
   
   if (nrow(dat) == 0) {
     return("No drought during this period!")
   }
+  
+  date_breaks <- dplyr::case_when(
+    max(dat$weeks) >= 8 ~ "1 month",
+    max(dat$weeks) <= 1 ~ "1 week",
+    TRUE ~ "2 weeks"
+  )
   
   dat %>% 
     ggplot(aes(y = plot_name, color = class)) +
@@ -94,7 +129,13 @@ plot_normal_grazing_w_drought <- function(county) {
                  linewidth = 2,
                  lineend = "butt",
                  linejoin = "mitre") +
-    scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +
+    ggrepel::geom_label_repel(
+      aes(x = midpoint, y = plot_name, label = n_weeks), 
+      min.segment.length = 0,
+      color="black",
+      size = 3
+    ) +
+    scale_x_date(date_labels = "%Y-%m-%d", date_breaks = date_breaks) +
     theme_minimal() +
     theme(
       axis.text.x = element_text(angle=45, hjust=1),
@@ -102,11 +143,11 @@ plot_normal_grazing_w_drought <- function(county) {
     ) +
     scale_color_manual(
       values = list(
-        "0" = "#ffff00",
-        "1" = "#fcd37f",
-        "2" = "#ffaa00",
-        "3" = "#e60000",
-        "4" = "#730000"
+        "D0" = "#ffff00",
+        "D1" = "#fcd37f",
+        "D2" = "#ffaa00",
+        "D3" = "#e60000",
+        "D4" = "#730000"
         )
     ) + 
     labs(
@@ -114,8 +155,7 @@ plot_normal_grazing_w_drought <- function(county) {
       y = "Forage Type", 
       x = "", 
       title = glue::glue(
-        "Drought During Normal Grazing Period"
+        "Drought During Normal Grazing Period in {title_name} County"
       )
     ) 
 }
-

@@ -38,6 +38,15 @@ if(!file.exists(file.path("data-derived", "fsa-counties.parquet")) | force.redo)
                  driver = "Parquet")
 }
 
+if(!file.exists(file.path("data-derived", "fsa-county-names.csv"))) {
+  sf::read_sf("/vsizip/data-raw/FSA_Counties_dd17.gdb.zip") %>% 
+    dplyr::transmute(
+      FSA_CODE = FSA_STCOU, name = glue::glue("{FSA_Name} ({STPO})")
+    ) %>% 
+    sf::st_drop_geometry() %>% 
+    readr::write_csv("./data-derived/fsa-county-names.csv")
+}
+
 if(!file.exists(file.path("data-derived", "fsa-counties.fgb")) | force.redo){
   unlink(file.path("data-derived", "fsa-counties.fgb"))
   
