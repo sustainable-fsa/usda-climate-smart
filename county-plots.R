@@ -17,8 +17,16 @@ county_names <-
   readr::read_csv(file.path("data-derived", "fsa-county-names.csv"),
                   show_col_types=FALSE)
 
-county = "30063"
-plot_normal_grazing_w_drought <- function(county) {
+county_names %>%
+  dplyr::filter(stringr::str_starts(name, "Missoula")) %>%
+  {list(
+    dplyr::filter(usdm_counties, FSA_CODE == .$FSA_CODE),
+    dplyr::filter(fsa_normal_grazing_periods, FSA_CODE == .$FSA_CODE),
+    dplyr::filter(fsa_lfp_eligibility, FSA_CODE == .$FSA_CODE)
+  )}
+
+county = "06091"
+plot_normal_grazing_w_drought <- function(county, year = 2023) {
   
   title_name <- county_names %>% 
     dplyr::filter(FSA_CODE == county) %$%
@@ -34,19 +42,19 @@ plot_normal_grazing_w_drought <- function(county) {
     tidyr::complete(date = seq(min(date), max(date), by = "1 day")) %>%
     tidyr::fill(class, .direction = "down")
   
-   grazing <- fsa_normal_grazing_periods %>% 
+  grazing <- fsa_normal_grazing_periods %>% 
     dplyr::filter(FSA_CODE == county) %>% 
     dplyr::rowwise() %>% 
     dplyr::mutate(
       names = stringr::str_split_1(`Type Name`, pattern = "; ") %>% 
-      unique() %>% 
-      {
-        ifelse(
-          length(.) > 2,
-          glue::glue('{paste(c(.[[1]], .[[2]]), collapse = "; ")}; {length(.) - 2} others...'), 
-          paste(., collapse = ";")
-        )
-      },
+        unique() %>% 
+        {
+          ifelse(
+            length(.) > 2,
+            glue::glue('{paste(c(.[[1]], .[[2]]), collapse = "; ")}; {length(.) - 2} others...'), 
+            paste(., collapse = ";")
+          )
+        },
       l = stringr::str_split_1(`Type Name`, pattern = "; ") %>% 
         unique() %>% 
         length()
@@ -66,12 +74,22 @@ plot_normal_grazing_w_drought <- function(county) {
     ) %>% 
     dplyr::arrange(plot_name) %>% 
     dplyr::mutate(plot_name = factor(plot_name)) 
-    # tidyr::pivot_longer(-plot_name, values_to = "date") %>% 
-    # dplyr::select(-name) %>%
-    # dplyr::group_by(plot_name) %>% 
-    # tidyr::complete(
-    #   date = seq(min(date), max(date), by = "1 day")
-    # )
+  # tidyr::pivot_longer(-plot_name, values_to = "date") %>% 
+  # dplyr::select(-name) %>%
+  # dplyr::group_by(plot_name) %>% 
+  # tidyr::complete(
+  #   date = seq(min(date), max(date), by = "1 day")
+  # )
+
+  
+  
+  grazing %>%
+    dplyr::rowwise() %>%
+    dplyr::reframe(start = lubridate::as_date(ifelse(lubridate::year(start) == lubridate::year(end), 
+                                 lubridate::`year<-`(start, year), 
+                                 lubridate::`year<-`(start, year - 1))),
+                  end = lubridate::`year<-`(end, year),
+                  plot_name)
   
   dat <- fuzzyjoin::fuzzy_left_join(
     drought, grazing,
@@ -99,16 +117,16 @@ plot_normal_grazing_w_drought <- function(county) {
       .groups = "drop"
     ) %>%
     dplyr::select(class, start, end, plot_name) %>%
-      dplyr::mutate(
-        class = paste0("D", class),
-        midpoint = start + (end - start) / 2,
-        end = end + 1,
-        total_days = as.numeric(difftime(end, start, units = "days")),
-        weeks = total_days %/% 7,
-        days = total_days %% 7,
-        n_weeks = ifelse(weeks > 0 & days > 0, paste(weeks, ifelse(weeks == 1, "Week", "Weeks"), "and", days, ifelse(days == 1, "Day", "Days")),
-                         ifelse(weeks > 0, paste(weeks, ifelse(weeks == 1, "Week", "Weeks")),
-                                paste(days, ifelse(days == 1, "Day", "Days"))))
+    dplyr::mutate(
+      # class = paste0("D", class),
+      midpoint = start + (end - start) / 2,
+      end = end + 1,
+      total_days = as.numeric(difftime(end, start, units = "days")),
+      weeks = total_days %/% 7,
+      days = total_days %% 7,
+      n_weeks = ifelse(weeks > 0 & days > 0, paste(weeks, ifelse(weeks == 1, "Week", "Weeks"), "and", days, ifelse(days == 1, "Day", "Days")),
+                       ifelse(weeks > 0, paste(weeks, ifelse(weeks == 1, "Week", "Weeks")),
+                              paste(days, ifelse(days == 1, "Day", "Days"))))
     ) %>%
     dplyr::filter(!is.na(class))
   
@@ -148,7 +166,7 @@ plot_normal_grazing_w_drought <- function(county) {
         "D2" = "#ffaa00",
         "D3" = "#e60000",
         "D4" = "#730000"
-        )
+      )
     ) + 
     labs(
       color = "USDM Class", 
@@ -159,3 +177,9 @@ plot_normal_grazing_w_drought <- function(county) {
       )
     ) 
 }
+
+county_names %>% 
+  dplyr::filter(stringr::str_starts(name, "Missoula")) %$%
+  plot_normal_grazing_w_drought(FSA_CODE)
+
+plot_normal_grazing_w_drought("01001")

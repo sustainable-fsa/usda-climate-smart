@@ -1,6 +1,7 @@
 library(magrittr)
 library(tidyverse)
 library(patchwork)
+library(terra)
 
 force.redo = FALSE
 
@@ -38,13 +39,19 @@ if(!file.exists(file.path("data-derived", "fsa-counties.parquet")) | force.redo)
                  driver = "Parquet")
 }
 
-if(!file.exists(file.path("data-derived", "fsa-county-names.csv"))) {
+if(!file.exists(file.path("data-derived", "fsa-county-names.parquet"))) {
   sf::read_sf("/vsizip/data-raw/FSA_Counties_dd17.gdb.zip") %>% 
     dplyr::transmute(
-      FSA_CODE = FSA_STCOU, name = glue::glue("{FSA_Name} ({STPO})")
+      FSA_CODE = FSA_STCOU, 
+      County = FSA_Name,
+      State = STATENAME
     ) %>% 
-    sf::st_drop_geometry() %>% 
-    readr::write_csv("./data-derived/fsa-county-names.csv")
+    sf::st_drop_geometry() %>%
+    dplyr::arrange(FSA_CODE) %>%
+    dplyr::distinct() %>%
+    arrow::write_parquet(file.path("data-derived", "fsa-county-names.parquet"),
+                         version = "latest",
+                         compression = "brotli")
 }
 
 if(!file.exists(file.path("data-derived", "fsa-counties.fgb")) | force.redo){
@@ -86,7 +93,7 @@ fsa_counties <-
 
 
 ## USDM Drought Assessment through time
-if(!file.exists(file.path("data-derived", "usdm-counties.parquet")) | force.redo){
+# if(!file.exists(file.path("data-derived", "usdm-counties.parquet")) | force.redo){
   unlink(file.path("data-derived", "usdm-counties.parquet"))
   
   source("~/git/mt-climate-office/usdm-archive/usdm-archive.R", 
@@ -112,12 +119,15 @@ if(!file.exists(file.path("data-derived", "usdm-counties.parquet")) | force.redo
                         values_to = "USDM Class") %>%
     dplyr::mutate(Date = stringr::str_remove(Date, "max.") %>%
                     lubridate::as_date(),
-                  `USDM Class` = as.integer(`USDM Class`)) %>%
+                  `USDM Class` = as.integer(`USDM Class`) %>%
+                    factor(levels = levels(usdm_raster[[1]])[[1]][[1]],
+                           labels = levels(usdm_raster[[1]])[[1]][[2]],
+                           ordered = TRUE)) %>%
     dplyr::arrange(FSA_CODE, Date, `USDM Class`) %>%
     arrow::write_parquet(file.path("data-derived", "usdm-counties.parquet"),
                          version = "latest",
                          compression = "brotli")
-}
+# }
 
 usdm_counties <-
   arrow::read_parquet(file.path("data-derived", "usdm-counties.parquet"))
