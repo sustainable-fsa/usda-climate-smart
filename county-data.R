@@ -96,9 +96,9 @@ fsa_counties <-
 # if(!file.exists(file.path("data-derived", "usdm-counties.parquet")) | force.redo){
   unlink(file.path("data-derived", "usdm-counties.parquet"))
   
-  source("~/git/mt-climate-office/usdm-archive/usdm-archive.R", 
-         local = TRUE, 
-         chdir = TRUE)
+  # source("~/git/mt-climate-office/usdm-archive/usdm-archive.R", 
+  #        local = TRUE, 
+  #        chdir = TRUE)
   
   file.copy("~/git/mt-climate-office/usdm-archive/usdm.mp4", 
             "usdm.mp4",
@@ -110,7 +110,7 @@ fsa_counties <-
                                         full.names = TRUE))
   
   exactextractr::exact_extract(usdm_raster, 
-                               fsa_counties, 
+                               sf::st_transform(fsa_counties, "EPSG:5070"), 
                                fun = "max", 
                                append_cols = TRUE) %>%
     tibble::as_tibble() %>%
@@ -180,3 +180,40 @@ if(!file.exists(file.path("data-derived", "fsa-lfp-eligibility.parquet")) | forc
 
 fsa_lfp_eligibility <-
   arrow::read_parquet(file.path("data-derived", "fsa-lfp-eligibility.parquet"))
+
+
+## FSA Payments through time
+if(!file.exists(file.path("data-derived", "fsa-farm-payments.parquet")) | force.redo){
+  unlink(file.path("data-derived", "fsa-farm-payments.parquet"))
+  
+  list.files("data-raw/fsa-payment-files",
+               full.names = TRUE) %>%
+    purrr::map_dfr(readxl::read_excel) %>%
+    dplyr::mutate(`State FSA Code` = stringr::str_pad(`State FSA Code`, width = 2, side = "left", pad = "0"),
+                  `County FSA Code` = stringr::str_pad(`State FSA Code`, width = 3, side = "left", pad = "0"),
+                  FSA_CODE = paste0(`State FSA Code`, `County FSA Code`)) %>%
+    dplyr::select(!c(`Delivery Point Bar Code`, `State FSA Code`, `County FSA Code`)) %>%
+    dplyr::select(FSA_CODE,
+                  `Accounting Program Code`,
+                  `Accounting Program Description`,
+                  `Accounting Program Year`,
+                  Name = `Formatted Payee Name`,
+                  `Mail To` = `Address Information Line`,
+                  Address = `Delivery Address Line`,
+                  City = `City Name`,
+                  ST = `State Abbreviation`,
+                  Zip = `Zip Code`,
+                  `Payment Date`,
+                  `Payment Amount` = `Disbursement Amount`) %>%
+    dplyr::group_by(across(c(-`Payment Amount`))) %>%
+    dplyr::summarise(`Payment Amount` = sum(`Payment Amount`, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::arrange(FSA_CODE, `Accounting Program Year`, `Accounting Program Code`, City, ST, Name, Address) %>%
+    dplyr::mutate(`Payment Date` = lubridate::as_date(`Payment Date`)) %>%
+    arrow::write_parquet(file.path("data-derived", "fsa-farm-payments.parquet"),
+                         version = "latest",
+                         compression = "brotli")
+  
+}
+
+fsa_farm_payments <-
+  arrow::read_parquet(file.path("data-derived", "fsa-farm-payments.parquet"))
