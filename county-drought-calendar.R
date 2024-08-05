@@ -303,6 +303,7 @@ plot_county <-
   }
 
 plot_county(county = "Missoula", state = "Montana")
+plot_county(county = "Missoula", state = "Montana", years = 2021:2024)
 plot_county("Powell", "Montana")
 plot_county("Flathead", "Montana")
 plot_county("Roosevelt", "Montana")
