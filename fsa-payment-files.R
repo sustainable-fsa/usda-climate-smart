@@ -31,38 +31,38 @@ fsa_payments <-
   dplyr::group_by(across(c(-Disbursement))) %>%
   dplyr::summarise(Disbursement = sum(Disbursement, na.rm = TRUE), .groups = "drop")
 
-fsa_payments %>%
-  dplyr::group_by(Year, State) %>%
-  dplyr::summarise(Disbursement = sum(Disbursement, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::filter(State %in% c("Washinton", 
-                             "Montana", 
-                             "Idaho", 
-                             "Oregon",
-                             "Wyoming",
-                             "Alaska"),
-                Year %in% 2020:2023
-  ) %>%
-  dplyr::arrange(State, Year) %>%
-  tidyr::pivot_wider(names_from = Year,
-                     values_from = Disbursement) %>%
-  kableExtra::kable(format = "simple")
+# fsa_payments %>%
+#   dplyr::group_by(Year, State) %>%
+#   dplyr::summarise(Disbursement = sum(Disbursement, na.rm = TRUE), .groups = "drop") %>%
+#   # dplyr::filter(State %in% c("Washinton", 
+#   #                            "Montana", 
+#   #                            "Idaho", 
+#   #                            "Oregon",
+#   #                            "Wyoming",
+#   #                            "Alaska"),
+#   #               Year %in% 2020:2023
+#   # ) %>%
+#   dplyr::arrange(State, Year) %>%
+#   tidyr::pivot_wider(names_from = Year,
+#                      values_from = Disbursement) %>%
+#   kableExtra::kable(format = "simple")
 
 
 class(fsa_payments$Disbursement) <- "currency"
 
 wb_workbook(creator = "Kyle Bocinsky",
-            title = "Northwest FSA Payments") %>%
+            title = "UMRB FSA Payments") %>%
   wb_add_worksheet("Payments") %>%
   wb_add_data_table("Payments", 
                     x = fsa_payments %>%
                       dplyr::arrange(FSA_CODE, City, ST, Zip, Address, Year) %>%
-                      dplyr::filter(State %in% c("Washinton", 
-                                                 "Montana", 
-                                                 "Idaho", 
-                                                 "Oregon",
+                      dplyr::filter(State %in% c("Montana",
+                                                 "Idaho",
+                                                 "North Dakota",
                                                  "Wyoming",
-                                                 "Alaska"),
-                                    Year %in% 2020:2023),
+                                                 "South Dakota",
+                                                 "Nebraska",
+                                                 "Iowa")),
                     table_style = "TableStyleLight1",
                     na.strings = ""
   ) %>%
@@ -73,4 +73,4 @@ wb_workbook(creator = "Kyle Bocinsky",
   ) %>%
   wb_set_col_widths(cols = 1:13,
                     widths = "auto") %>%
-  wb_save(file = "data-derived/fsa-payment-files-NW.xlsx")
+  wb_save(file = "data-derived/fsa-payment-files-umrb-2017.xlsx")
