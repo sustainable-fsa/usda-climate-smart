@@ -1,7 +1,7 @@
 library(tidyverse)
 library(magrittr)
 
-source("county-data.R")
+# source("county-data.R")
 
 usdm_counties <-
   arrow::read_parquet(file.path("data-derived", "usdm-counties.parquet"))
@@ -302,36 +302,78 @@ plot_county <-
     
   }
 
-plot_county(county = "Missoula", state = "Montana")
-plot_county(county = "Missoula", state = "Montana", years = 2021:2024)
+# plot_county(county = "Missoula", state = "Montana")
+plot_county(county = "Missoula", state = "Montana", years = 2017:2024)
+plot_county(county = "Asotin", state = "Washington", years = 2017:2024)
+plot_county(county = "Okanogan", state = "Washington", years = 2017:2024)
+plot_county(county = "Douglas", state = "Washington", years = 2017:2024)
+plot_county(county = "Lake", state = "Montana", years = 2017:2024)
 plot_county("Powell", "Montana")
 plot_county("Flathead", "Montana")
 plot_county("Roosevelt", "Montana")
+plot_county("Ravalli", "Montana", years = 2017:2024)
 plot_county("Boise", "Idaho")
+plot_county("Glacier", "Montana", years = 2001:2024)
+plot_county("Carter", "Montana", years = 2001:2024)
+plot_county("Fallon", "Montana", years = 2001:2024)
+
+get_fsa_grazing_periods <-
+  function(county, state){
+    county_names %>%
+      dplyr::filter(County == county,
+                    State == state) %>%
+      dplyr::left_join(
+        arrow::read_parquet(file.path("data-derived", "fsa-normal-grazing-periods.parquet"))
+      ) %>%
+      dplyr::arrange(`Grazing Period Start Date`, 
+                     # `Grazing Period End Date`, 
+                     `Crop Name`, 
+                     `Type Name`)
+  }
 
 
-library(tidyverse)
-library(openxlsx2)
-options("openxlsx2.maxWidth" = 64)
+c("Glacier","Carter", "Fallon") %T>%
+  purrr::walk(\(x) plot_county(county = x, state = "Montana")) %>%
+  purrr::walk(\(x){
+    get_fsa_grazing_periods(county = x, state = "Montana") %>%
+      readr::write_csv(paste0(x, "_Montana.csv"))  
+  })
 
-wb_workbook(creator = "Kyle Bocinsky",
-            title = "Montana Drought Classes — 2023-07-30") %>%
-  wb_add_worksheet("Counties") %>%
-  wb_add_data_table("Counties", 
-                    x = usdm_counties %>%
-                      dplyr::filter(Date == max(Date)) %>%
-                      dplyr::left_join(county_names) %>%
-                      dplyr::filter(State == "Montana") %>%
-                      dplyr::arrange(dplyr::desc(`USDM Class`), County) %>%
-                      dplyr::select(County, `USDM Class`),
-                    table_style = "TableStyleLight1",
-                    na.strings = ""
-  ) %>%
-  wb_freeze_pane(first_row = TRUE) %>%
-  wb_add_cell_style(
-    dims = "A1:M7000",
-    wrap_text = "1"
-  ) %>%
-  wb_set_col_widths(cols = 1:13,
-                    widths = "auto") %>%
-  wb_save(file = "data-derived/Montana Drought Classes — 2023-07-30.xlsx")
+
+
+
+
+get_fsa_grazing_periods(county = "Asotin", state = "Washington")
+get_fsa_grazing_periods(county = "Okanogan", state = "Washington") %>%
+  readr::write_csv("Okanogan_Washington.csv")
+
+get_fsa_grazing_periods(county = "Douglas", state = "Washington") %>%
+  readr::write_csv("Douglas_Washington.csv")
+
+
+
+# library(tidyverse)
+# library(openxlsx2)
+# options("openxlsx2.maxWidth" = 64)
+# 
+# wb_workbook(creator = "Kyle Bocinsky",
+#             title = "Montana Drought Classes — 2023-08-08") %>%
+#   wb_add_worksheet("Counties") %>%
+#   wb_add_data_table("Counties", 
+#                     x = usdm_counties %>%
+#                       dplyr::filter(Date == max(Date)) %>%
+#                       dplyr::left_join(county_names) %>%
+#                       dplyr::filter(State == "Montana") %>%
+#                       dplyr::arrange(dplyr::desc(`USDM Class`), County) %>%
+#                       dplyr::select(County, `USDM Class`),
+#                     table_style = "TableStyleLight1",
+#                     na.strings = ""
+#   ) %>%
+#   wb_freeze_pane(first_row = TRUE) %>%
+#   wb_add_cell_style(
+#     dims = "A1:M7000",
+#     wrap_text = "1"
+#   ) %>%
+#   wb_set_col_widths(cols = 1:13,
+#                     widths = "auto") %>%
+#   wb_save(file = "data-derived/Montana Drought Classes — 2023-08-08.xlsx")
