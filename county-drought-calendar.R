@@ -3,8 +3,25 @@ library(magrittr)
 
 # source("county-data.R")
 
+# Sys.setenv("AWS_ACCESS_KEY_ID"     = keyring::key_get("aws_access_key_id"),
+#            "AWS_SECRET_ACCESS_KEY" = keyring::key_get("aws_secret_access_key"),
+#            "AWS_DEFAULT_REGION"    = "us-west-2")
+# 
+# arrow::s3_bucket("climate-smart-usda/usdm-archive/county/parquet/") |>
+#   arrow::open_dataset() |>
+#   dplyr::filter(date == "2024-12-31") |>
+#   dplyr::collect()
+#   
+# 
+# sf::st_read(dsn = "/vsis3/climate-smart-usda/usdm-archive/usdm/parquet/")
+
 usdm_counties <-
-  arrow::read_parquet(file.path("data-derived", "usdm-counties.parquet"))
+  list.files("~/Desktop/usdm-archive/county",
+             full.names = TRUE) %>%
+  magrittr::set_names(., tools::file_path_sans_ext(basename(.))) %>%
+  purrr::map_dfr(arrow::read_parquet,
+                 .id = "Date") %>%
+  dplyr::mutate(Date = lubridate::as_date(Date))
 
 county_names <- 
   arrow::read_parquet(file.path("data-derived", "fsa-county-names.parquet"))
@@ -24,10 +41,6 @@ county_drought_calendar <-
     
     # years <- 2000:2024
     # county <- "30063"
-    
-    
-    
-    
     
     calendar_data <-
       usdm_counties %>%
@@ -303,10 +316,10 @@ plot_county <-
   }
 
 # plot_county(county = "Missoula", state = "Montana")
-plot_county(county = "Missoula", state = "Montana", years = 2017:2024)
+plot_county(county = "Missoula", state = "Montana", years = 2001:2024)
 plot_county(county = "Asotin", state = "Washington", years = 2017:2024)
 plot_county(county = "Okanogan", state = "Washington", years = 2017:2024)
-plot_county(county = "Douglas", state = "Washington", years = 2017:2024)
+plot_county(county = "Douglas", state = "Washington", years = 2001:2024)
 plot_county(county = "Lake", state = "Montana", years = 2017:2024)
 plot_county("Powell", "Montana")
 plot_county("Flathead", "Montana")
@@ -316,6 +329,10 @@ plot_county("Boise", "Idaho")
 plot_county("Glacier", "Montana", years = 2001:2024)
 plot_county("Carter", "Montana", years = 2001:2024)
 plot_county("Fallon", "Montana", years = 2001:2024)
+plot_county("Steuben", "New York", years = 2001:2024)
+
+
+plot_county("McKinley", "New Mexico", years = 2001:2024)
 
 get_fsa_grazing_periods <-
   function(county, state){
@@ -350,7 +367,28 @@ get_fsa_grazing_periods(county = "Okanogan", state = "Washington") %>%
 get_fsa_grazing_periods(county = "Douglas", state = "Washington") %>%
   readr::write_csv("Douglas_Washington.csv")
 
+get_fsa_grazing_periods(county = "Missoula", state = "Montana") %>%
+  readr::write_csv("Missoula_Montana.csv")
 
+get_fsa_grazing_periods(county = "McKinley", state = "New Mexico") %>%
+  readr::write_csv("McKinley_New Mexico.csv")
+
+get_fsa_grazing_periods(county = "Steuben", state = "New York") %>%
+  readr::write_csv("Steuben_New York.csv")
+
+
+calendar_and_grazing <-
+  function(county, state){
+    plot_county(county, state, years = 2001:2024)
+    get_fsa_grazing_periods(county = county, state = state) %>%
+      readr::write_csv(paste0(county, "_", state,".csv"))
+  }
+
+calendar_and_grazing(county = "Steuben", state = "New York")
+calendar_and_grazing(county = "Emery", state = "Utah")
+calendar_and_grazing(county = "Carbon", state = "Utah")
+calendar_and_grazing(county = "Cherry", state = "Nebraska")
+calendar_and_grazing(county = "Tulsa", state = "Oklahoma")
 
 # library(tidyverse)
 # library(openxlsx2)
