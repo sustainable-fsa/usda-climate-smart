@@ -7,13 +7,13 @@ library(magrittr)
 #            "AWS_SECRET_ACCESS_KEY" = keyring::key_get("aws_secret_access_key"),
 #            "AWS_DEFAULT_REGION"    = "us-west-2")
 # 
-# arrow::s3_bucket("climate-smart-usda/usdm-archive/county/parquet/") |>
+# arrow::s3_bucket("sustainable-fsa/usdm-archive/county/parquet/") |>
 #   arrow::open_dataset() |>
 #   dplyr::filter(date == "2024-12-31") |>
 #   dplyr::collect()
 #   
 # 
-# sf::st_read(dsn = "/vsis3/climate-smart-usda/usdm-archive/usdm/parquet/")
+# sf::st_read(dsn = "/vsis3/sustainable-fsa/usdm-archive/usdm/parquet/")
 
 usdm_counties <-
   list.files("~/Desktop/usdm-archive/county",
